@@ -1,78 +1,143 @@
 import scrapy
+from selenium import webdriver
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import selenium.webdriver.support.ui as ui
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.common.by import By
 import logging
-from datetime import datetime, timedelta, date
-from scrapy_splash import SplashRequest
 import time
 import re
+from datetime import datetime, timedelta
+import os
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+
+
+def to_time(check):
+
+    re_Findhour = re.compile(r'\d+(?=\s+hours)', flags=re.IGNORECASE)
+    re_Findminute = re.compile(r'\d+(?=\s+minutes)', flags=re.IGNORECASE)
+
+    temp_hour = None
+    temp_min = None
+
+    if len(re_Findhour.findall(check)) >= 1:
+        temp_hour = re_Findhour.findall(check)[0]
+
+    if len(re_Findminute.findall(check)) >= 1:
+        temp_min = re_Findminute.findall(check)[0]
+
+    now_time = datetime.now()
+
+    if temp_hour is not None:
+        now_time -= timedelta(seconds=int(temp_hour) * 60 * 60)
+
+    if temp_min is not None:
+        now_time -= timedelta(seconds=int(temp_min) * 60)
+
+    return now_time
 
 
 class proxSpider(scrapy.Spider):
 
     name = "proxscrap"
-    http_user = '668e696bbce24c299dfc096632663ce0'
 
-    js_source_code = '''
-    function main(splash)
-        assert(splash:go(splash.args.url))
-        local get_dimensions = splash:jsfunc([[
-            function () {
-                var rect = document.getElementByXpath('.//a[@aria-controls="proxylisttable"]').getClientRects()[0];
-                return {"x": rect.left, "y": rect.top}
-            }
-        ]])
-        splash:set_viewport_full()
-        splash:wait(0.1)
-        local dimensions = get_dimensions()
-        splash:mouse_click(dimensions.x, dimensions.y)
-        -- Wait split second to allow event to propagate.
-        splash:wait(0.1)
-        return splash:html()
-    end
-    '''
+    pdir = os.path.abspath(__file__ + "/../../../")
+    chromePath = pdir + '/chromedriver.exe'
 
-    splash_args = {
-        'wait': 6,
-        'js_source': js_source_code
-    }
+    caps = DesiredCapabilities.CHROME
+    caps['loggingPrefs'] = {'performance': 'ALL'}
+
+
+    def __init__(self):
+
+        self.chrome_options = webdriver.ChromeOptions()
+        self.chrome_options.add_argument("--incognito")
+
+        # self.chrome_options.add_argument("--proxy-server={0}".format(self.proxy.proxy))
+
+        self.driver = webdriver.Chrome(executable_path=self.chromePath, chrome_options=self.chrome_options,
+                                       desired_capabilities=self.caps)
+        self.wait = WebDriverWait(self.driver, 0.5)
+
+
+    def is_visible(self, locator, timeout=20):
+        try:
+            time.sleep(1)
+            ui.WebDriverWait(self.driver, timeout).until(EC.visibility_of_element_located((By.XPATH, locator)))
+            return True
+        except TimeoutException:
+            return False
+
 
     def start_requests(self):
         url = 'https://www.us-proxy.org/'
 
-        yield SplashRequest(url=url, callback=self.parse,
-                            args = self.splash_args)
+        yield scrapy.Request(url=url, callback=self.parse)
 
     def parse(self, response):
+
         logging.info(u'--------------begin-------------------')
+        self.driver.get(response.url)
 
-        rows = response.xpath(".//table[@id='proxylisttable']//tr")
+        rows_path = ".//table[@id='proxylisttable']//tr"
 
-        re_Findtd = re.compile(r'(?<=>).*(?=</td>)', flags=re.IGNORECASE)
+        self.is_visible(rows_path)
+
+        rows = self.driver.find_elements_by_xpath(rows_path)
 
         for row in rows:
             temp_item = {}
-            if len(row.xpath(".//td").extract()) == 8:
-                ip = row.xpath(".//td").extract()[0]
-                port = row.xpath(".//td").extract()[1]
 
-                if len(re_Findtd.findall(ip)) > 0:
-                    ip = re_Findtd.findall(ip)[0]
-                    temp_item['ip'] = ip
+            if len(row.find_elements_by_xpath(".//td")) == 8:
+                ip = row.find_elements_by_xpath(".//td")[0].get_attribute('innerHTML')
+                port = row.find_elements_by_xpath(".//td")[1].get_attribute('innerHTML')
 
-                if len(re_Findtd.findall(port)) > 0:
-                    port = re_Findtd.findall(port)[0]
-                    temp_item['port'] = port
+                temp_item['ip'] = ip + ':' + port
 
-                if len( row.xpath(".//td[@class='hx']").extract()) > 0:
-                    https = row.xpath(".//td[@class='hx']").extract()[0]
+                https = row.find_elements_by_xpath(".//td[@class='hx']")[0].get_attribute('innerHTML')
+                temp_item['https'] = https
 
-                    if len(re_Findtd.findall(https)) > 0:
-                        https = re_Findtd.findall(https)[0]
-                        temp_item['https'] = https
+                check = row.find_elements_by_xpath(".//td[@class='hm']")[2].get_attribute('innerHTML')
 
-                print(temp_item)
+                now_time = to_time(check)
+
+                temp_item['check'] = now_time
+
                 yield temp_item
 
-        next_page = response.xpath(".//li[@id='proxylisttable_next']//a").extract()
 
-        print(next_page)
+        for i in range(2):
 
+            button =self.driver.find_element_by_xpath(".//a[@data-dt-idx='9']")
+            button.click()
+
+            rows_path = ".//table[@id='proxylisttable']//tr"
+
+            self.is_visible(rows_path)
+
+            rows = self.driver.find_elements_by_xpath(rows_path)
+
+            re_Findtd = re.compile(r'(?<=>).*(?=</td>)', flags=re.IGNORECASE)
+
+            for row in rows:
+                temp_item = {}
+
+                if len(row.find_elements_by_xpath(".//td")) == 8:
+                    ip = row.find_elements_by_xpath(".//td")[0].get_attribute('innerHTML')
+                    port = row.find_elements_by_xpath(".//td")[1].get_attribute('innerHTML')
+
+                    temp_item['ip'] = ip + ':' + port
+
+                    https = row.find_elements_by_xpath(".//td[@class='hx']")[0].get_attribute('innerHTML')
+                    temp_item['https'] = https
+
+                    check = row.find_elements_by_xpath(".//td[@class='hm']")[2].get_attribute('innerHTML')
+
+                    now_time = to_time(check)
+
+                    temp_item['check'] = now_time
+
+                    yield temp_item
+
+                    time.sleep(2)

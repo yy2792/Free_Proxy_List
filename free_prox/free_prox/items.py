@@ -11,4 +11,6 @@ import scrapy
 class FreeProxItem(scrapy.Item):
     # define the fields for your item here like:
     # name = scrapy.Field()
-    pass
+    ip = scrapy.Field()
+    https = scrapy.Field()
+    check = scrapy.Field()

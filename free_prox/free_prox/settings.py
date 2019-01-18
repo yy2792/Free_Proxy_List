@@ -21,23 +21,11 @@ NEWSPIDER_MODULE = 'free_prox.spiders'
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = True
 
-SPLASH_URL = 'https://a8pl7w45-splash.scrapinghub.com/'
-
 
 ITEM_PIPELINES = {
     'free_prox.pipelines.FreeProxPipeline': 300,
 }
 
-DOWNLOADER_MIDDLEWARES = {
-    'scrapy_splash.SplashCookiesMiddleware': 723,
-    'scrapy_splash.SplashMiddleware': 725,
-    'scrapy.downloadermiddlewares.httpcompression.HttpCompressionMiddleware': 810,
-    'scrapy.downloadermiddlewares.useragent.UserAgentMiddleware': None,
-    'free_prox.middlewares.UserAgentMiddleware': 300,
-}
-
-DUPEFILTER_CLASS = 'scrapy_splash.SplashAwareDupeFilter'
-HTTPCACHE_STORAGE = 'scrapy_splash.SplashAwareFSCacheStorage'
 
 MY_USER_AGENT = [
     'MSIE (MSIE 6.0; X11; Linux; i686) Opera 7.23',
