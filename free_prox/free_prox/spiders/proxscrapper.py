@@ -107,7 +107,7 @@ class proxSpider(scrapy.Spider):
                 yield temp_item
 
 
-        for i in range(2):
+        for i in range(9):
 
             button =self.driver.find_element_by_xpath(".//a[@data-dt-idx='9']")
             button.click()
@@ -140,4 +140,5 @@ class proxSpider(scrapy.Spider):
 
                     yield temp_item
 
-                    time.sleep(2)
+            time.sleep(2)
+        
