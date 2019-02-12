@@ -38,15 +38,13 @@ def to_time(check):
 
 
 class proxSpider(scrapy.Spider):
-
-    name = "proxscrap"
+    name = "proxscrap2"
 
     pdir = os.path.abspath(__file__ + "/../../../")
     chromePath = pdir + '/chromedriver.exe'
 
     caps = DesiredCapabilities.CHROME
     caps['loggingPrefs'] = {'performance': 'ALL'}
-
 
     def __init__(self):
 
@@ -59,7 +57,6 @@ class proxSpider(scrapy.Spider):
                                        desired_capabilities=self.caps)
         self.wait = WebDriverWait(self.driver, 0.5)
 
-
     def is_visible(self, locator, timeout=20):
         try:
             time.sleep(1)
@@ -68,9 +65,8 @@ class proxSpider(scrapy.Spider):
         except TimeoutException:
             return False
 
-
     def start_requests(self):
-        url = 'https://www.us-proxy.org/'
+        url = 'https://www.proxy-list.download/HTTPS'
         # url = 'https://www.sslproxies.org/'
 
         yield scrapy.Request(url=url, callback=self.parse)
@@ -80,65 +76,48 @@ class proxSpider(scrapy.Spider):
         logging.info(u'--------------begin-------------------')
         self.driver.get(response.url)
 
-        rows_path = ".//table[@id='proxylisttable']//tr"
+        rows_path = ".//tbody[@id='tabli']//tr"
 
         self.is_visible(rows_path)
 
         rows = self.driver.find_elements_by_xpath(rows_path)
 
+
         for row in rows:
             temp_item = {}
 
-            if len(row.find_elements_by_xpath(".//td")) == 8:
-                ip = row.find_elements_by_xpath(".//td")[0].get_attribute('innerHTML')
-                port = row.find_elements_by_xpath(".//td")[1].get_attribute('innerHTML')
 
-                temp_item['ip'] = ip + ':' + port
+            ip = row.find_elements_by_xpath(".//td")[0].text
+            port = row.find_elements_by_xpath(".//td")[1].text
+            country = row.find_elements_by_xpath(".//td")[3].text
 
-                https = row.find_elements_by_xpath(".//td[@class='hx']")[0].get_attribute('innerHTML')
-                temp_item['https'] = https
+            temp_item['ip'] = ip + ':' + port
+            temp_item['https'] = 'yes'
+            temp_item['country'] = country
 
-                check = row.find_elements_by_xpath(".//td[@class='hm']")[2].get_attribute('innerHTML')
-
-                now_time = to_time(check)
-
-                temp_item['check'] = now_time
-
-                yield temp_item
+            yield temp_item
 
 
-        for i in range(9):
+        for i in range(200):
 
-            button =self.driver.find_element_by_xpath(".//a[@data-dt-idx='9']")
+            button = self.driver.find_element_by_xpath(".//a[@id='btn2']")
             button.click()
 
-            rows_path = ".//table[@id='proxylisttable']//tr"
+            rows_path = ".//tbody[@id='tabli']//tr"
 
             self.is_visible(rows_path)
 
             rows = self.driver.find_elements_by_xpath(rows_path)
 
-            re_Findtd = re.compile(r'(?<=>).*(?=</td>)', flags=re.IGNORECASE)
-
             for row in rows:
-                temp_item = {}
 
-                if len(row.find_elements_by_xpath(".//td")) == 8:
-                    ip = row.find_elements_by_xpath(".//td")[0].get_attribute('innerHTML')
-                    port = row.find_elements_by_xpath(".//td")[1].get_attribute('innerHTML')
+                ip = row.find_elements_by_xpath(".//td")[0].text
+                port = row.find_elements_by_xpath(".//td")[1].text
 
-                    temp_item['ip'] = ip + ':' + port
+                temp_item['ip'] = ip + ':' + port
+                temp_item['https'] = 'yes'
+                temp_item['country'] = country
 
-                    https = row.find_elements_by_xpath(".//td[@class='hx']")[0].get_attribute('innerHTML')
-                    temp_item['https'] = https
+                yield temp_item
 
-                    check = row.find_elements_by_xpath(".//td[@class='hm']")[2].get_attribute('innerHTML')
-
-                    now_time = to_time(check)
-
-                    temp_item['check'] = now_time
-
-                    yield temp_item
-
-            time.sleep(2)
-        
+            time.sleep(1)
